@@ -3,6 +3,8 @@
 An iPhone app, written in Common Lisp, for the things you mean to do every so
 often: "Call Mum" shows *28 days ago*, and when you call her you reset it.
 
+<img src="screenshot.png" width="300" alt="The list in the simulator: Call Mum in red at 28 days ago, Water the plants in orange at 4 days ago, Haircut plain at 20 days ago, and two items in green, one done a day ago and one just now.">
+
 Each item has a title and a **Too long** time (a number of hours, days, weeks
 or months). Rows are tinted by how far through that time they are:
 
