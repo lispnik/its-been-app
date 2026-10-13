@@ -22,6 +22,7 @@
                 :serial t
                 :components ((:file "package")
                              (:file "store")
+                             (:file "notify")
                              (:file "table")
                              (:file "form")
                              (:file "app"))))
@@ -35,6 +36,7 @@
   :bundle-icon "res/Icon.xcassets"
   :bundle-device-family (:iphone)
   :bundle-orientations (:portrait)
+  :bundle-frameworks ("UIKit" "Foundation" "CoreGraphics" "UserNotifications")
   ;; No encryption beyond what iOS itself provides, so no export-compliance
   ;; question on every upload.
   :bundle-info-plist (("ITSAppUsesNonExemptEncryption" . :false))

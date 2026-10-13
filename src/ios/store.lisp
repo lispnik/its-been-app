@@ -6,6 +6,9 @@
 
 (defvar *items-path* nil)
 
+(defun now ()
+  (get-universal-time))
+
 (defun note (format &rest arguments)
   "A line on the console, for simctl launch --console-pty and Console.app."
   (format t "~&ITS-BEEN: ~?~%" format arguments)
@@ -26,6 +29,9 @@
     (note "items ~(~a~), ~d of them, at ~a" status (length items) *items-path*)))
 
 (defun save ()
+  "Write the list, and reschedule its notifications: every change to the list
+comes through here."
   (handler-case (save-items *items-path*)
     (error (condition)
-      (note "could not save: ~a" condition))))
+      (note "could not save: ~a" condition)))
+  (sync-notifications))

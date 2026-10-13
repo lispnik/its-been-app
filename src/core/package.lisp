@@ -16,4 +16,8 @@
    #:invalid-item #:invalid-item-reason
    #:*items* #:find-item #:add-item #:update-item #:reset-item #:delete-item
    #:validate-title #:validate-amount #:parse-amount
-   #:save-items #:load-items))
+   #:save-items #:load-items
+   ;; notifications
+   #:+notification-limit+ #:item-due #:overdue-p #:overdue-count
+   #:notification-identifier #:identifier-item-id #:notification-text
+   #:notification-schedule))

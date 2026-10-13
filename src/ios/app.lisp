@@ -2,6 +2,7 @@
 ;;;;
 ;;;; A heading with the + button, then the list.  Tapping a row offers to reset
 ;;;; it -- the thing done most often -- or to edit it; a swipe deletes it.
+;;;; Opening an item's notification opens the same menu.
 
 (in-package #:its-been-ios)
 
@@ -53,6 +54,16 @@ originals are needed only until the next menu replaces them.")
                        (objc:invoke (if (cffi:null-pointer-p cell) *table* cell) "bounds")))))
     (objc:invoke (ui:root-controller) "presentViewController:animated:completion:" sheet t nil)))
 
+(defun show-item (id)
+  "The row menu for item ID, as if its row had been tapped: what opening its
+notification does.  Not over a form or another menu that is already up."
+  (reload-table)
+  (let ((row (position id (source-cache *source*) :key #'item-id)))
+    (when (and row (cffi:null-pointer-p (objc:invoke (ui:root-controller) "presentedViewController")))
+      (let ((path (objc:invoke "NSIndexPath" "indexPathForRow:inSection:" row 0)))
+        (objc:invoke *table* "scrollToRowAtIndexPath:atScrollPosition:animated:" path 2 nil)
+        (row-menu (nth row (source-cache *source*)) path)))))
+
 (defun remove-item (item)
   (when (delete-item (item-id item))
     (save)
@@ -91,7 +102,8 @@ originals are needed only until the next menu replaces them.")
 
 (defun keep-current ()
   "Elapsed times move on their own: redraw every minute, and on coming back to
-the foreground, when the minute timer has been asleep."
+the foreground, when the minute timer has been asleep.  The badge is set by
+each redraw."
   (ui:after-every 60 (lambda (timer)
                        (declare (ignore timer))
                        (reload-table)))
@@ -114,10 +126,18 @@ the foreground, when the minute timer has been asleep."
       (add "Haircut" 6 :weeks 20)             ; still time: plain
       (add "Back up the laptop" 1 :months 1)  ; just done: green
       (add "Call Dad" 1 :weeks 0))
+    (when (ext:getenv "ITS_BEEN_DEMO_SOON")
+      ;; Call Dad goes too long a few seconds from now, so its notification
+      ;; can be seen without waiting a week.
+      (let ((dad (find "Call Dad" *items* :key #'item-title :test #'string=)))
+        (setf (item-last-reset dad)
+              (+ (- now (item-too-long dad))
+                 (parse-integer (ext:getenv "ITS_BEEN_DEMO_SOON"))))))
     (note "demo: ~d items" (length *items*))))
 
 (defun start ()
   (objc:ensure-objc-initialized)
+  (install-notification-delegate #'show-item)
   (open-items)
   (when (ext:getenv "ITS_BEEN_DEMO")
     (demo-items))
@@ -125,6 +145,7 @@ the foreground, when the minute timer has been asleep."
     (objc:invoke root "setBackgroundColor:" (ui:system-color "systemBackground"))
     (build-list root (build-heading root)))
   (keep-current)
+  (sync-notifications)
   (let ((show (ext:getenv "ITS_BEEN_DEMO_SHOW")))
     ;; A screen opened from code, since a simulator here has no finger:
     ;; "add", "edit" or "menu", on the top row.

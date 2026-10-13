@@ -25,9 +25,6 @@
 (defun source-item (source row)
   (nth row (source-cache source)))
 
-(defun now ()
-  (get-universal-time))
-
 ;;; Colour ---------------------------------------------------------------------------
 
 (defun status-color (status)
@@ -148,7 +145,8 @@ with the clock, not only when something is changed."
   (when *table*
     (setf (source-cache *source*) (sort-by-urgency *items* (now)))
     (objc:invoke *table* "reloadData")
-    (update-empty-state)))
+    (update-empty-state)
+    (update-badge)))
 
 (defun make-item-table (&key select remove)
   "The table of items.  SELECT is called with an item and its index path when

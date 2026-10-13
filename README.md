@@ -18,6 +18,10 @@ or months). Rows are tinted by how far through that time they are:
 The most overdue items are at the top. Tap a row to reset it ("Did it just
 now") or edit it; swipe left to delete; + adds one.
 
+When an item goes past its Too long, a notification says so ("It's been
+1 week since you last did this"), and opening it brings up that item's menu
+so it can be reset. The app icon's badge counts the overdue items.
+
 ## Building
 
 The core (`its-been.asd`, `src/core/`) is portable Common Lisp with FiveAM
@@ -35,6 +39,8 @@ with ECL.
     make icon       # redraw res/Icon.xcassets from tools/icon.lisp
 
 `ITS_BEEN_DEMO_SHOW=add|edit|menu` (as `SIMCTL_CHILD_...`) opens that screen
-at launch, for screenshots without a finger.
+at launch, for screenshots without a finger, and `ITS_BEEN_DEMO_SOON=20` makes
+a demo item go overdue, and notify, 20 seconds after launch. A demo launch asks
+for notifications provisionally, so no permission prompt blocks it.
 
 The list is saved in the app's Documents directory as `its-been.sexp`.
