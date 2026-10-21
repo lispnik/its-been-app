@@ -5,8 +5,10 @@ often: "Call Mum" shows *28 days ago*, and when you call her you reset it.
 
 <img src="screenshot.png" width="300" alt="The list in the simulator: Call Mum in red at 28 days ago, Water the plants in orange at 4 days ago, Haircut plain at 20 days ago, and two items in green, one done a day ago and one just now.">
 
-Each item has a title and a **Too long** time (a number of hours, days, weeks
-or months). Rows are tinted by how far through that time they are:
+Each item has a title, a **Too long** time (a number of hours, days, weeks
+or months), and when it was **Last done** -- now, unless you set it. Setting
+Last done later in Edit records another time you did it; setting it earlier
+corrects a mistaken reset, which is taken back on every phone. Rows are tinted by how far through that time they are:
 
 | Colour | When |
 |---|---|

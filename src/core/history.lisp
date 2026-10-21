@@ -15,13 +15,12 @@
   (cons (item-last-reset item) (item-history item)))
 
 (defun set-item-resets (item resets)
-  "Make RESETS, in any order and with repeats, ITEM's history."
-  (let ((resets (sort (remove-duplicates (copy-list resets)) #'>)))
+  "Make RESETS, in any order and with repeats, ITEM's history: all but those
+it has retracted."
+  (let ((resets (sort (set-difference (remove-duplicates resets) (item-retracted item))
+                      #'>)))
     (setf (item-last-reset item) (first resets)
-          (item-history item) (let ((rest (rest resets)))
-                                (if (> (length rest) +history-limit+)
-                                    (subseq rest 0 +history-limit+)
-                                    rest)))
+          (item-history item) (limit-list (rest resets) +history-limit+))
     item))
 
 (defun reset-gaps (item)
@@ -54,3 +53,19 @@ the one before it."
                       ((= time (item-created item))
                        (format nil "~a, added" (format-date time time-zone)))
                       (t (format-date time time-zone)))))
+
+(defun limit-list (list limit)
+  (if (> (length list) limit) (subseq list 0 limit) list))
+
+(defun set-last-done (item time)
+  "Say ITEM was last done at TIME.
+
+Later than its last reset, TIME is one more: a time it was done and not
+reset.  Earlier, it is a correction: the resets after TIME did not happen,
+and are retracted, so that merging does not bring them back."
+  (let ((later (remove-if (lambda (reset) (<= reset time)) (item-resets item))))
+    (when (< time (item-last-reset item))
+      (setf (item-retracted item)
+            (limit-list (sort (union later (item-retracted item)) #'>) +history-limit+)))
+    (setf (item-retracted item) (remove time (item-retracted item)))
+    (set-item-resets item (cons time (item-resets item)))))

@@ -23,6 +23,9 @@
   (last-reset 0 :type integer)
   ;; The resets before LAST-RESET, newest first: see history.lisp.
   (history '() :type list)
+  ;; Resets taken back by setting the last done time earlier, so that a copy
+  ;; from another phone that still has them does not put them back.
+  (retracted '() :type list)
   (created 0 :type integer)
   ;; When the title or too-long last changed, so that of two copies of an
   ;; item edited on two phones the later edit wins.
@@ -66,6 +69,7 @@ does not shuffle between two reloads."
         :unit (item-unit item)
         :last-reset (item-last-reset item)
         :history (item-history item)
+        :retracted (item-retracted item)
         :created (item-created item)
         :modified (item-modified item)))
 
@@ -79,5 +83,6 @@ MODIFIED has neither, and gets none and its creation time."
                :unit (getf plist :unit)
                :last-reset (getf plist :last-reset)
                :history (getf plist :history)
+               :retracted (getf plist :retracted)
                :created created
                :modified (or (getf plist :modified) created))))

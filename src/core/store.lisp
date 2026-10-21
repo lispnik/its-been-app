@@ -50,6 +50,13 @@ phone that still has it does not bring it back.  See sync.lisp.")
       unit
       (invalid (format nil "~s is not a unit of time." unit))))
 
+(defun validate-last-done (time &key (now (get-universal-time)))
+  "TIME, or INVALID-ITEM if it is in the future.  A minute's grace, for a
+picker that was set to now a moment ago."
+  (if (and (integerp time) (<= time (+ now 60)))
+      (min time now)
+      (invalid "Last done can't be in the future.")))
+
 (defun find-item (id)
   (find id *items* :key #'item-id))
 
@@ -64,13 +71,15 @@ item while apart would both pick the next number, and the lists merge by id."
         unless (or (find-item id) (assoc id *deleted*))
           return id))
 
-(defun add-item (title amount unit &key (now (get-universal-time)))
-  "A new item, just done.  Returns it."
+(defun add-item (title amount unit &key (now (get-universal-time)) last-done)
+  "A new item, done at LAST-DONE, or just now.  Returns it."
   (let ((item (make-item :id (next-id)
                          :title (validate-title title)
                          :amount (validate-amount amount)
                          :unit (validate-unit unit)
-                         :last-reset now
+                         :last-reset (if last-done
+                                         (validate-last-done last-done :now now)
+                                         now)
                          :created now
                          :modified now)))
     (setf *items* (append *items* (list item)))
@@ -97,6 +106,13 @@ or NIL if there is none."
   (let ((item (find-item id)))
     (when item
       (set-item-resets item (cons now (item-resets item))))))
+
+(defun change-last-done (id time &key (now (get-universal-time)))
+  "Item ID was last done at TIME (see SET-LAST-DONE).  Returns it, or NIL."
+  (let ((item (find-item id))
+        (time (validate-last-done time :now now)))
+    (when item
+      (set-last-done item time))))
 
 (defun delete-item (id &key (now (get-universal-time)))
   "Remove item ID.  True if there was one."
