@@ -22,6 +22,7 @@
                 :serial t
                 :components ((:file "package")
                              (:file "store")
+                             (:file "cloud")
                              (:file "notify")
                              (:file "table")
                              (:file "form")
@@ -43,6 +44,13 @@
   ;; Required of every app: what it collects (nothing) and which
   ;; required-reason APIs it uses (none).
   :bundle-resources (("res/PrivacyInfo.xcprivacy" . "PrivacyInfo.xcprivacy"))
+  ;; An App Store build syncs the list through iCloud, and asdf-ios-app's
+  ;; entitlements carry only what every app has, so it gets its own.  Other
+  ;; builds keep the defaults: their profiles have no iCloud to grant, and the
+  ;; list stays on the phone.
+  :entitlements #.(if (uiop:getenv "ITS_BEEN_DISTRIBUTION")
+                      (merge-pathnames "res/distribution.entitlements" *load-truename*)
+                      :ios-default)
   ;; A distribution build must not let a debugger attach.
   :get-task-allow #.(not (uiop:getenv "ITS_BEEN_DISTRIBUTION"))
   :bundle-platforms #.(let ((identity (uiop:getenv "IOS_SIGNING_IDENTITY")))

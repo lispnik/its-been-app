@@ -18,5 +18,5 @@
 
 (defmacro with-items ((&rest bindings) &body body)
   "BODY with an empty list of items, so no test sees another's."
-  `(let ((*items* '()) ,@bindings)
+  `(let ((*items* '()) (*deleted* '()) ,@bindings)
      ,@body))

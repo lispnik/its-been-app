@@ -62,11 +62,11 @@ call FUNCTION on the main thread if it was given."
 
 (objc:define-objc-block-type add-reply :void (objc:objc-object-pointer))
 
-(defun schedule-notification (item seconds badge)
-  (multiple-value-bind (title body) (notification-text item)
+(defun schedule-notification (item seconds badge times)
+  (multiple-value-bind (title body) (notification-text item times)
     (let ((content (objc:invoke (objc:alloc-init-object "UNMutableNotificationContent")
                                 "autorelease"))
-          (identifier (notification-identifier item)))
+          (identifier (notification-identifier item times)))
       (objc:invoke content "setTitle:" title)
       (objc:invoke content "setBody:" body)
       (objc:invoke content "setSound:" (objc:invoke "UNNotificationSound" "defaultSound"))
@@ -92,11 +92,24 @@ call FUNCTION on the main thread if it was given."
     (serious-condition (condition)
       (note "badge: ~a" condition))))
 
+(defun ns-array (list)
+  (let ((array (objc:invoke "NSMutableArray" "array")))
+    (dolist (element list array)
+      (objc:invoke array "addObject:" element))))
+
+(defun clear-settled ()
+  "Take out of Notification Center what was delivered for items done since."
+  (let ((identifiers (settled-identifiers *items* (now))))
+    (when identifiers
+      (objc:invoke (center) "removeDeliveredNotificationsWithIdentifiers:"
+                   (ns-array identifiers)))))
+
 (defun sync-notifications ()
   "Replace every pending notification with what the list says now."
   (handler-case
       (let ((schedule (notification-schedule *items* (now))))
         (objc:invoke (center) "removeAllPendingNotificationRequests")
+        (clear-settled)
         (when schedule
           (when-authorized
            (lambda ()
@@ -104,8 +117,8 @@ call FUNCTION on the main thread if it was given."
              ;; looking at the prompt.
              (let ((schedule (notification-schedule *items* (now))))
                (objc:invoke (center) "removeAllPendingNotificationRequests")
-               (loop for (item seconds badge) in schedule
-                     do (schedule-notification item seconds badge))
+               (loop for (item seconds badge times) in schedule
+                     do (schedule-notification item seconds badge times))
                (note "~d notification~:p scheduled~@[, the first in ~d s~]"
                      (length schedule) (second (first schedule))))
              (update-badge))))

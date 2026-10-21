@@ -17,7 +17,9 @@
                 :components ((:file "package")
                              (:file "duration")
                              (:file "item")
+                             (:file "history")
                              (:file "store")
+                             (:file "sync")
                              (:file "reminders"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:its-been/tests))))
 
@@ -31,6 +33,8 @@
                              (:file "duration-tests")
                              (:file "item-tests")
                              (:file "store-tests")
+                             (:file "history-tests")
+                             (:file "sync-tests")
                              (:file "reminders-tests"))))
   ;; FIVEAM:RUN! prints failures but returns NIL, and ASDF discards what a
   ;; TEST-OP returns -- which is how a suite goes green with failing tests.

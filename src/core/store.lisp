@@ -8,6 +8,10 @@
 (defvar *items* '()
   "Every item, in the order they were added.")
 
+(defvar *deleted* '()
+  "(ID . TIME) for each item deleted, so that a copy of the list from another
+phone that still has it does not bring it back.  See sync.lisp.")
+
 (define-condition invalid-item (error)
   ((reason :initarg :reason :reader invalid-item-reason))
   (:report (lambda (condition stream)
@@ -49,8 +53,16 @@
 (defun find-item (id)
   (find id *items* :key #'item-id))
 
+(defvar *id-random-state* nil)
+
 (defun next-id ()
-  (1+ (reduce #'max *items* :key #'item-id :initial-value 0)))
+  "A new item's id: random, not the next number, because two phones adding an
+item while apart would both pick the next number, and the lists merge by id."
+  (unless *id-random-state*
+    (setf *id-random-state* (make-random-state t)))
+  (loop for id = (1+ (random (expt 2 48) *id-random-state*))
+        unless (or (find-item id) (assoc id *deleted*))
+          return id))
 
 (defun add-item (title amount unit &key (now (get-universal-time)))
   "A new item, just done.  Returns it."
@@ -59,11 +71,13 @@
                          :amount (validate-amount amount)
                          :unit (validate-unit unit)
                          :last-reset now
-                         :created now)))
+                         :created now
+                         :modified now)))
     (setf *items* (append *items* (list item)))
     item))
 
-(defun update-item (id &key (title nil title-p) (amount nil amount-p) (unit nil unit-p))
+(defun update-item (id &key (title nil title-p) (amount nil amount-p) (unit nil unit-p)
+                          (now (get-universal-time)))
   "Change what is given of item ID.  Everything is checked before anything
 changes, so a bad amount does not leave a new title behind.  Returns the item,
 or NIL if there is none."
@@ -74,63 +88,81 @@ or NIL if there is none."
             (unit (if unit-p (validate-unit unit) (item-unit item))))
         (setf (item-title item) title
               (item-amount item) amount
-              (item-unit item) unit)
+              (item-unit item) unit
+              (item-modified item) now)
         item))))
 
 (defun reset-item (id &key (now (get-universal-time)))
   "Item ID was done NOW.  Returns it, or NIL."
   (let ((item (find-item id)))
     (when item
-      (setf (item-last-reset item) now)
-      item)))
+      (set-item-resets item (cons now (item-resets item))))))
 
-(defun delete-item (id)
+(defun delete-item (id &key (now (get-universal-time)))
   "Remove item ID.  True if there was one."
   (let ((item (find-item id)))
     (when item
       (setf *items* (remove item *items*))
+      (push (cons id now) *deleted*)
       t)))
 
 ;;; The file ------------------------------------------------------------------
+;;;
+;;; The same text is the file on the phone and the copy in iCloud.
 
-(defconstant +format-version+ 1)
+(defconstant +format-version+ 2
+  "1 had no deletions, histories or modification times; it still reads.")
 
-(defun save-items (path &optional (items *items*))
+(defun items-string (&optional (items *items*) (deleted *deleted*))
+  (with-standard-io-syntax
+    (let ((*print-readably* nil)
+          (*print-pretty* nil))
+      (prin1-to-string (list :its-been +format-version+
+                             :items (mapcar #'item-plist items)
+                             :deleted deleted)))))
+
+(defun read-items-string (string)
+  "The items and the deletions in STRING, or an error if it is not a list of
+them."
+  (let ((form (with-standard-io-syntax
+                (let ((*read-eval* nil))
+                  (read-from-string string)))))
+    (unless (and (consp form) (eq (first form) :its-been)
+                 (integerp (second form)))
+      (error "This is not an It's Been... list."))
+    (values (mapcar #'plist-item (getf (cddr form) :items))
+            (getf (cddr form) :deleted))))
+
+(defun save-items (path &optional (items *items*) (deleted *deleted*))
   "Write ITEMS to PATH, by way of a temporary file renamed over it."
   (let ((temporary (make-pathname :type "tmp" :defaults path)))
     (ensure-directories-exist path)
     (with-open-file (out temporary :direction :output :if-exists :supersede
                                    :external-format :utf-8)
-      (with-standard-io-syntax
-        (let ((*print-readably* nil)
-              (*print-pretty* nil))
-          (format out ";;;; It's Been... Times are Common Lisp universal times.~%")
-          (prin1 (list :its-been +format-version+
-                       :items (mapcar #'item-plist items))
-                 out)
-          (terpri out))))
+      (format out ";;;; It's Been... Times are Common Lisp universal times.~%")
+      (write-string (items-string items deleted) out)
+      (terpri out))
     (rename-file temporary path #+ecl :if-exists #+ecl t)
     path))
 
+(defun file-string (path)
+  (with-open-file (in path :external-format :utf-8)
+    (let ((text (make-string (file-length in))))
+      (subseq text 0 (read-sequence text in)))))
+
 (defun load-items (path)
-  "The items saved at PATH.  Returns them and :LOADED, :MISSING or :CORRUPT.
+  "The items saved at PATH.  Returns them, :LOADED, :MISSING or :CORRUPT, and
+the deletions.
 
 A corrupt file is moved aside rather than overwritten by the next save, so
 what was in it can still be recovered by hand."
   (if (not (probe-file path))
-      (values '() :missing)
+      (values '() :missing '())
       (handler-case
-          (let ((form (with-open-file (in path :external-format :utf-8)
-                        (with-standard-io-syntax
-                          (let ((*read-eval* nil))
-                            (read in))))))
-            (unless (and (consp form) (eq (first form) :its-been)
-                         (integerp (second form)))
-              (error "~a is not an It's Been... file." path))
-            (values (mapcar #'plist-item (getf (cddr form) :items))
-                    :loaded))
+          (multiple-value-bind (items deleted) (read-items-string (file-string path))
+            (values items :loaded deleted))
         (error ()
           (ignore-errors
            (rename-file path (make-pathname :type "corrupt" :defaults path)
                         #+ecl :if-exists #+ecl t))
-          (values '() :corrupt)))))
+          (values '() :corrupt '())))))

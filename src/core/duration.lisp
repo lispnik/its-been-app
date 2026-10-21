@@ -31,16 +31,36 @@ unit picker shows them.")
   "\"1 day\", \"2 weeks\"."
   (format nil "~d ~a~:[s~;~]" amount (unit-label unit) (= amount 1)))
 
-(defun format-elapsed (seconds)
-  "How long ago SECONDS was, in the largest unit that fits under a year.
+(defun format-span (seconds)
+  "How long SECONDS is, in the largest unit that fits under a year:
+\"9 days\", \"5 hours\".  Never less than a minute.
 
-Days rather than weeks or months: \"28 days ago\" is what a person counts
-when asking how long it has been."
-  (flet ((ago (count unit)
-           (format nil "~d ~a~:[s~;~] ago" count unit (= count 1))))
+Days rather than weeks or months: \"28 days\" is what a person counts when
+asking how long it has been."
+  (flet ((span (count unit)
+           (format nil "~d ~a~:[s~;~]" count unit (= count 1))))
     (let ((seconds (max 0 seconds)))
-      (cond ((< seconds 60) "just now")
-            ((< seconds 3600) (ago (floor seconds 60) "minute"))
-            ((< seconds 86400) (ago (floor seconds 3600) "hour"))
-            ((< seconds (* 365 86400)) (ago (floor seconds 86400) "day"))
-            (t (ago (floor seconds (* 365 86400)) "year"))))))
+      (cond ((< seconds 3600) (span (max 1 (floor seconds 60)) "minute"))
+            ((< seconds 86400) (span (floor seconds 3600) "hour"))
+            ((< seconds (* 365 86400)) (span (floor seconds 86400) "day"))
+            (t (span (floor seconds (* 365 86400)) "year"))))))
+
+(defun format-elapsed (seconds)
+  "How long ago SECONDS was: \"just now\", \"28 days ago\"."
+  (if (< seconds 60)
+      "just now"
+      (format nil "~a ago" (format-span seconds))))
+
+(defparameter +month-names+
+  #("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"))
+
+(defun format-date (time &optional time-zone)
+  "TIME, a universal time, as \"6 Oct 2026, 14:05\".  Local time unless
+TIME-ZONE is given."
+  (multiple-value-bind (second minute hour day month year)
+      (if time-zone
+          (decode-universal-time time time-zone)
+          (decode-universal-time time))
+    (declare (ignore second))
+    (format nil "~d ~a ~d, ~2,'0d:~2,'0d"
+            day (aref +month-names+ (1- month)) year hour minute)))

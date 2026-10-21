@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- What an App Store build claims: what asdf-ios-app derives from the
+     profile, plus iCloud key-value storage, which it does not.  Each must be
+     granted by the profile (App ID com.burnsidemk.itsbeen, with iCloud). -->
+<plist version="1.0">
+<dict>
+	<key>application-identifier</key>
+	<string>Q47YS469F2.com.burnsidemk.itsbeen</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>Q47YS469F2</string>
+	<key>beta-reports-active</key>
+	<true/>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>Q47YS469F2.com.burnsidemk.itsbeen</string>
+</dict>
+</plist>

@@ -1,6 +1,7 @@
 ;;;; src/ios/store.lisp -- where the list lives on the phone.
 ;;;;
-;;;; The app's Documents directory, which is backed up and survives updates.
+;;;; The app's Documents directory, which is backed up and survives updates,
+;;;; and a copy in iCloud (cloud.lisp).
 
 (in-package #:its-been-ios)
 
@@ -24,14 +25,19 @@
 
 (defun open-items ()
   (setf *items-path* (merge-pathnames "its-been.sexp" (documents-directory)))
-  (multiple-value-bind (items status) (load-items *items-path*)
-    (setf *items* items)
+  (multiple-value-bind (items status deleted) (load-items *items-path*)
+    (setf *items* items
+          *deleted* deleted)
     (note "items ~(~a~), ~d of them, at ~a" status (length items) *items-path*)))
 
-(defun save ()
-  "Write the list, and reschedule its notifications: every change to the list
-comes through here."
+(defun save-locally ()
   (handler-case (save-items *items-path*)
     (error (condition)
-      (note "could not save: ~a" condition)))
+      (note "could not save: ~a" condition))))
+
+(defun save ()
+  "Write the list, send it to iCloud, and reschedule its notifications: every
+change to the list made here comes through here."
+  (save-locally)
+  (push-to-cloud)
   (sync-notifications))

@@ -1,7 +1,8 @@
 ;;;; src/ios/app.lisp -- the entry point, the screen it builds, and the row menu.
 ;;;;
 ;;;; A heading with the + button, then the list.  Tapping a row offers to reset
-;;;; it -- the thing done most often -- or to edit it; a swipe deletes it.
+;;;; it -- the thing done most often -- to see when it was done before, or to
+;;;; edit it; a swipe deletes it.
 ;;;; Opening an item's notification opens the same menu.
 
 (in-package #:its-been-ios)
@@ -34,15 +35,18 @@ originals are needed only until the next menu replaces them.")
   (let* ((now (now))
          (sheet (objc:invoke "UIAlertController" "alertControllerWithTitle:message:preferredStyle:"
                              (item-title item)
-                             (format nil "Last done ~a. Too long after ~a."
+                             (format nil "Last done ~a. Too long after ~a.~@[~%~a~]"
                                      (format-elapsed (elapsed item now))
-                                     (format-duration (item-amount item) (item-unit item)))
+                                     (format-duration (item-amount item) (item-unit item))
+                                     (history-summary item))
                              0)))                                  ; action sheet
     (menu-action sheet "Did it just now"
                  (lambda ()
                    (reset-item (item-id item))
                    (save)
                    (reload-table)))
+    (when (item-history item)
+      (menu-action sheet "History" (lambda () (show-history item))))
     (menu-action sheet "Edit" (lambda () (show-form item)))
     (menu-action sheet "Cancel" (lambda () nil) 1)
     ;; On an iPad a sheet is a popover, and a popover with no anchor is a crash.
@@ -53,6 +57,22 @@ originals are needed only until the next menu replaces them.")
           (objc:invoke popover "setSourceRect:"
                        (objc:invoke (if (cffi:null-pointer-p cell) *table* cell) "bounds")))))
     (objc:invoke (ui:root-controller) "presentViewController:animated:completion:" sheet t nil)))
+
+(defconstant +history-shown+ 20
+  "How many past resets the History alert lists.")
+
+(defun show-history (item)
+  "When ITEM was done, newest first, and how long after the time before."
+  (let* ((lines (history-lines item))
+         (shown (subseq lines 0 (min +history-shown+ (length lines))))
+         (alert (objc:invoke "UIAlertController" "alertControllerWithTitle:message:preferredStyle:"
+                             (item-title item)
+                             (format nil "~@[~a~%~%~]~{~a~^~%~}~:[~;~%…~]"
+                                     (history-summary item) shown
+                                     (> (length lines) (length shown)))
+                             1)))                                  ; alert
+    (menu-action alert "Done" (lambda () nil) 1)
+    (objc:invoke (ui:root-controller) "presentViewController:animated:completion:" alert t nil)))
 
 (defun show-item (id)
   "The row menu for item ID, as if its row had been tapped: what opening its
@@ -119,9 +139,14 @@ each redraw."
   (let ((now (now))
         (day 86400))
     (setf *items* '())
-    (flet ((add (title amount unit days-ago)
-             (add-item title amount unit :now (- now (* days-ago day)))))
-      (add "Call Mum" 1 :weeks 28)            ; four times too long: red
+    (flet ((add (title amount unit days-ago &rest earlier)
+             ;; EARLIER: days ago it was done before, oldest first.
+             (let ((item (add-item title amount unit
+                                   :now (- now (* (or (first earlier) days-ago) day)))))
+               (dolist (days (append (rest earlier) (and earlier (list days-ago))))
+                 (reset-item (item-id item) :now (- now (* days day))))
+               item)))
+      (add "Call Mum" 1 :weeks 28 71 64 55 47 36)  ; four times too long: red
       (add "Water the plants" 3 :days 4)      ; too long: orange
       (add "Haircut" 6 :weeks 20)             ; still time: plain
       (add "Back up the laptop" 1 :months 1)  ; just done: green
@@ -145,10 +170,15 @@ each redraw."
     (objc:invoke root "setBackgroundColor:" (ui:system-color "systemBackground"))
     (build-list root (build-heading root)))
   (keep-current)
+  ;; Not a demo's made-up items, which would replace the real ones everywhere.
+  (unless (ext:getenv "ITS_BEEN_DEMO")
+    (handler-case (start-cloud)
+      (serious-condition (condition)
+        (note "iCloud: ~a" condition))))
   (sync-notifications)
   (let ((show (ext:getenv "ITS_BEEN_DEMO_SHOW")))
     ;; A screen opened from code, since a simulator here has no finger:
-    ;; "add", "edit" or "menu", on the top row.
+    ;; "add", "edit", "menu" or "history", on the top row.
     (when show
       (let (timer)
         (setf timer
@@ -158,6 +188,7 @@ each redraw."
                                   (let ((top (first (sort-by-urgency *items* (now)))))
                                     (cond ((string= show "add") (show-form))
                                           ((and top (string= show "edit")) (show-form top))
+                                          ((and top (string= show "history")) (show-history top))
                                           ((and top (string= show "menu"))
                                            (row-menu top (objc:invoke "NSIndexPath"
                                                                       "indexPathForRow:inSection:"

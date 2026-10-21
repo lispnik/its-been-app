@@ -21,7 +21,12 @@
   (amount 1 :type (integer 1))
   (unit :days :type keyword)
   (last-reset 0 :type integer)
-  (created 0 :type integer))
+  ;; The resets before LAST-RESET, newest first: see history.lisp.
+  (history '() :type list)
+  (created 0 :type integer)
+  ;; When the title or too-long last changed, so that of two copies of an
+  ;; item edited on two phones the later edit wins.
+  (modified 0 :type integer))
 
 (defun item-too-long (item)
   "ITEM's too-long, in seconds."
@@ -60,12 +65,19 @@ does not shuffle between two reloads."
         :amount (item-amount item)
         :unit (item-unit item)
         :last-reset (item-last-reset item)
-        :created (item-created item)))
+        :history (item-history item)
+        :created (item-created item)
+        :modified (item-modified item)))
 
 (defun plist-item (plist)
-  (make-item :id (getf plist :id)
-             :title (getf plist :title)
-             :amount (getf plist :amount)
-             :unit (getf plist :unit)
-             :last-reset (getf plist :last-reset)
-             :created (or (getf plist :created) (getf plist :last-reset))))
+  "The item PLIST describes.  A plist from before there was a history or a
+MODIFIED has neither, and gets none and its creation time."
+  (let ((created (or (getf plist :created) (getf plist :last-reset))))
+    (make-item :id (getf plist :id)
+               :title (getf plist :title)
+               :amount (getf plist :amount)
+               :unit (getf plist :unit)
+               :last-reset (getf plist :last-reset)
+               :history (getf plist :history)
+               :created created
+               :modified (or (getf plist :modified) created))))
